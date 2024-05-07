@@ -1,0 +1,49 @@
+
+from algorithms.sync_eo import run_sim
+from algorithms.utils import dump_pickle, RESULT_DIR  
+from tqdm import tqdm
+import numpy as np
+from datetime import datetime
+
+n = 80
+hs = np.linspace(0,0.5,25)[1:]
+extras = [0.1,0.3,0.15]
+hs = np.concatenate((hs, extras))
+#hs = np.arange(0,0.5,step=0.01)[1:]
+#hs = [0.1]
+t_wanted = 7
+
+save_every = 50
+trials = 1000
+
+results_dir = RESULT_DIR / f'sync-eo-comparison_BDCM-{t_wanted=}-n={n}-quenched_lt' 
+results_dir.mkdir(exist_ok=True, parents=True)
+
+saving_seed = np.random.randint(0,100000)
+current_date = datetime.now().strftime("%Y-%m-%d")
+p = results_dir / f'{current_date}_{saving_seed}.pkl'
+
+pbar = tqdm(total=trials*2)
+results = []
+
+t_wanted = 7
+
+for _ in range(trials):
+    for c in [1]:#,2]:
+        for h in np.random.permutation(hs):
+            converged = False
+            print(h)
+            J_ij = None
+            while not converged:
+                res, J_ij = run_sim(n=n,h=h,record_energy=True,record_fields=True,max_t=t_wanted+c,J_ij=J_ij)
+                converged = (res['c'] == c) and (res['transient'] <= t_wanted)
+                
+            if h not in extras:
+                del res['fields']
+                del res['xfields']
+            results.append(res)
+            
+            if len(results) % save_every == 0:
+                dump_pickle(results, p)
+        pbar.update(1)
+    
